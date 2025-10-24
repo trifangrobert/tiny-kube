@@ -22,6 +22,15 @@ namespace tinykube {
             }
         }
 
+        void sweep(int64_t now_ms, int64_t timeout_ms = 30000) {
+            std::lock_guard<std::mutex> lock(mutex_);
+            for (auto& [name, state] : nodes_) {
+                if (state.is_stale(now_ms, timeout_ms)) {
+                    state.status = NodeStatus::SUSPECT;
+                }
+            }
+        }
+
         bool remove(const std::string& node_name) {
             std::lock_guard<std::mutex> lock(mutex_);
             return nodes_.erase(node_name) > 0;
