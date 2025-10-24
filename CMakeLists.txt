@@ -59,7 +59,7 @@ target_compile_options(proto_lib PUBLIC ${PROTOBUF_CFLAGS_OTHER} ${GRPC_CFLAGS_O
 
 add_executable(tinykube_control src/control/main.cpp)
 target_link_libraries(tinykube_control proto_lib)
-target_include_directories(tinykube_control PRIVATE ${PROTO_BINARY_DIR})
+target_include_directories(tinykube_control PRIVATE ${PROTO_BINARY_DIR} include)
 
 add_executable(tinykube_agent src/agent/main.cpp)
 target_link_libraries(tinykube_agent proto_lib)
