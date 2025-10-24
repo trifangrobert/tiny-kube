@@ -1,0 +1,27 @@
+syntax = "proto3";
+package tinykube;
+
+message NodeInfo {
+    string name = 1;
+}
+
+message RegisterRequest {
+    NodeInfo node = 1;
+}
+
+message RegisterResponse {
+    bool accepted = 1;
+    string reason = 2;
+}
+
+message Heartbeat {
+    string node_name = 1;
+    int64 now_unix_ms = 2;
+}
+
+message Empty {}
+
+service ControlPlane {
+    rpc RegisterNode(RegisterRequest) returns (RegisterResponse);
+    rpc StreamHeartbeats(stream Heartbeat) returns (Empty);
+}
