@@ -191,9 +191,6 @@ private:
 void signal_handler(int signal) {
     std::cout << "\n🛑 Received signal " << signal << ", shutting down gracefully..." << std::endl;
     g_running.store(false);
-    if (g_server) {
-        g_server->Shutdown();
-    }
 }
 
 int main() {
@@ -224,10 +221,19 @@ int main() {
             std::this_thread::sleep_for(std::chrono::seconds(5));
         }
     });
+    std::thread terminator([&](){
+        while (g_running.load(std::memory_order_relaxed)) {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+        if (g_server) {
+            g_server->Shutdown();
+        }
+    });
 
     server_thread.join();
     monitor.join();
-    
+    terminator.join();
+
     std::cout << "👋 Server shutdown complete" << std::endl;
     return 0;
 }
