@@ -89,7 +89,7 @@ void print_usage(const char* program_name) {
     std::cout << "\nOptions:" << std::endl;
     std::cout << "  -n, --node-name <name>    Node name for registration (required)" << std::endl;
     std::cout << "  -s, --server <address>    Control plane server address (default: localhost:50051)" << std::endl;
-    std::cout << "  -h, --help               Show this help message" << std::endl;
+    std::cout << "  -h, --help                Show this help message" << std::endl;
     std::cout << "\nExamples:" << std::endl;
     std::cout << "  " << program_name << " --node-name worker-1" << std::endl;
     std::cout << "  " << program_name << " -n worker-2 -s 192.168.1.100:50051" << std::endl;
