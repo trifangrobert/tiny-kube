@@ -3,6 +3,8 @@
 #include <string>
 #include <thread>
 #include <chrono>
+#include <atomic>
+#include <csignal>
 #include <grpcpp/grpcpp.h>
 #include "control_plane.grpc.pb.h"
 #include "control_plane.pb.h"
@@ -11,6 +13,18 @@ using grpc::Channel;
 using grpc::ClientContext;
 using grpc::ClientWriter;
 using grpc::Status;
+
+std::atomic<bool> g_running{true};
+
+std::mutex shutdown_mutex;
+std::condition_variable shutdown_cv;
+
+void signal_handler(int signal) {
+    std::cout << "\n🛑 Received signal " << signal << ", shutting down gracefully..." << std::endl;
+    g_running.store(false, std::memory_order_relaxed);
+    
+    shutdown_cv.notify_all();
+}
 
 class TinyKubeAgent {
 private:
@@ -55,7 +69,8 @@ public:
         std::unique_ptr<ClientWriter<tinykube::Heartbeat>> writer(
             stub_->StreamHeartbeats(&context, &response));
 
-        for (int i = 0; i < 10; ++i) {  // Send 10 heartbeats
+        int heartbeat_count = 0;
+        while (g_running.load(std::memory_order_relaxed)) {
             tinykube::Heartbeat heartbeat;
             heartbeat.set_node_name(node_name_);
             
@@ -64,19 +79,22 @@ public:
             heartbeat.set_now_unix_ms(now);
 
             if (!writer->Write(heartbeat)) {
-                std::cout << "💔 Failed to send heartbeat" << std::endl;
+                std::cout << "💔 Failed to send heartbeat, connection lost" << std::endl;
                 break;
             }
+
+            heartbeat_count++;
+            std::cout << "💗 Sent heartbeat #" << heartbeat_count << " at " << now << "ms" << std::endl;
             
-            std::cout << "💗 Sent heartbeat #" << (i+1) << " at " << now << "ms" << std::endl;
             std::this_thread::sleep_for(std::chrono::seconds(1));
         }
 
+        std::cout << "🛑 Stopping heartbeats..." << std::endl;
         writer->WritesDone();
         Status status = writer->Finish();
         
         if (status.ok()) {
-            std::cout << "✅ Heartbeat stream completed successfully" << std::endl;
+            std::cout << "✅ Heartbeat stream completed successfully (" << heartbeat_count << " sent)" << std::endl;
         } else {
             std::cout << "❌ Heartbeat stream failed: " << status.error_message() << std::endl;
         }
@@ -144,16 +162,27 @@ int main(int argc, char* argv[]) {
     std::cout << "📛 Node Name: " << node_name << std::endl;
     std::cout << "🎯 Control Plane: " << server_address << std::endl;
 
-    // Create channel to server
+    std::signal(SIGINT, signal_handler);
+    std::signal(SIGTERM, signal_handler);
+
     auto channel = grpc::CreateChannel(server_address, grpc::InsecureChannelCredentials());
     TinyKubeAgent agent(channel, node_name);
 
-    // First register with control plane
     if (agent.RegisterWithControlPlane()) {
         std::cout << "🎉 Agent registered successfully, starting heartbeats..." << std::endl;
         
-        // Start sending heartbeats
-        agent.StartHeartbeats();
+        std::thread heartbeat_thread([&agent]() {
+            agent.StartHeartbeats();
+        });
+
+        std::unique_lock<std::mutex> lock(shutdown_mutex);
+        shutdown_cv.wait(lock, []() {
+            return !g_running.load(std::memory_order_relaxed);
+        });
+
+        std::cout << "🛑 Waiting for heartbeat thread to finish..." << std::endl;
+        heartbeat_thread.join();
+
     } else {
         std::cout << "💥 Failed to register with control plane, exiting..." << std::endl;
         return 1;
