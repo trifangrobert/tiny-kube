@@ -83,16 +83,70 @@ public:
     }
 };
 
-int main() {
+void print_usage(const char* program_name) {
+    std::cout << "🤖 TinyKube Agent - Node Registration & Heartbeat Client\n" << std::endl;
+    std::cout << "Usage: " << program_name << " [OPTIONS]" << std::endl;
+    std::cout << "\nOptions:" << std::endl;
+    std::cout << "  -n, --node-name <name>    Node name for registration (required)" << std::endl;
+    std::cout << "  -s, --server <address>    Control plane server address (default: localhost:50051)" << std::endl;
+    std::cout << "  -h, --help               Show this help message" << std::endl;
+    std::cout << "\nExamples:" << std::endl;
+    std::cout << "  " << program_name << " --node-name worker-1" << std::endl;
+    std::cout << "  " << program_name << " -n worker-2 -s 192.168.1.100:50051" << std::endl;
+    std::cout << "  " << program_name << " --node-name control-node --server localhost:9090\n" << std::endl;
+}
+
+int main(int argc, char* argv[]) {
     std::string server_address("localhost:50051");
-    std::string node_name("worker-node-1");
+    std::string node_name;
+
+    // Parse command line arguments
+    for (int i = 1; i < argc; i++) {
+        std::string arg = argv[i];
+        
+        if (arg == "-h" || arg == "--help") {
+            print_usage(argv[0]);
+            return 0;
+        }
+        else if (arg == "-n" || arg == "--node-name") {
+            if (i + 1 < argc) {
+                node_name = argv[++i];
+            } else {
+                std::cerr << "❌ Error: --node-name requires a value" << std::endl;
+                print_usage(argv[0]);
+                return 1;
+            }
+        }
+        else if (arg == "-s" || arg == "--server") {
+            if (i + 1 < argc) {
+                server_address = argv[++i];
+            } else {
+                std::cerr << "❌ Error: --server requires a value" << std::endl;
+                print_usage(argv[0]);
+                return 1;
+            }
+        }
+        else {
+            std::cerr << "❌ Error: Unknown argument '" << arg << "'" << std::endl;
+            print_usage(argv[0]);
+            return 1;
+        }
+    }
+
+    // Validate required arguments
+    if (node_name.empty()) {
+        std::cerr << "❌ Error: Node name is required!" << std::endl;
+        print_usage(argv[0]);
+        return 1;
+    }
+
+    std::cout << "🤖 TinyKube Agent starting..." << std::endl;
+    std::cout << "📛 Node Name: " << node_name << std::endl;
+    std::cout << "🎯 Control Plane: " << server_address << std::endl;
 
     // Create channel to server
     auto channel = grpc::CreateChannel(server_address, grpc::InsecureChannelCredentials());
     TinyKubeAgent agent(channel, node_name);
-
-    std::cout << "🤖 TinyKube Agent starting..." << std::endl;
-    std::cout << "🎯 Connecting to Control Plane at " << server_address << std::endl;
 
     // First register with control plane
     if (agent.RegisterWithControlPlane()) {
