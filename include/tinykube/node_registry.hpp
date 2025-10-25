@@ -22,10 +22,13 @@ namespace tinykube {
             }
         }
 
-        void sweep(int64_t now_ms, int64_t timeout_ms = 30000) {
+        void sweep(int64_t now_ms, int64_t suspect_timeout_ms = 30000, int64_t not_ready_timeout_ms = 10000) {
             std::lock_guard<std::mutex> lock(mutex_);
             for (auto& [name, state] : nodes_) {
-                if (state.is_stale(now_ms, timeout_ms)) {
+                if (state.is_not_ready(now_ms, not_ready_timeout_ms)) {
+                    state.status = NodeStatus::NOT_READY;
+                }
+                else if (state.is_suspect(now_ms, suspect_timeout_ms)) {
                     state.status = NodeStatus::SUSPECT;
                 }
             }

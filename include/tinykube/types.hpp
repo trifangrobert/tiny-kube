@@ -21,8 +21,12 @@ namespace tinykube {
             return status == NodeStatus::READY;
         }
 
-        bool is_stale(int64_t current_time_ms, int64_t timeout_ms = 30000) const {
+        bool is_suspect(int64_t current_time_ms, int64_t timeout_ms = 30000) const {
             return (current_time_ms - last_seen_ms) > timeout_ms;
+        }
+
+        bool is_not_ready(int64_t current_time_ms, int64_t not_ready_timeout_ms = 10000) const {
+            return (current_time_ms - last_seen_ms) > not_ready_timeout_ms;
         }
     };
 

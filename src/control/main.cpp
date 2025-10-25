@@ -21,6 +21,7 @@ using grpc::ServerReader;
 using grpc::Status;
 
 const int64_t HEARTBEAT_TIMEOUT_MS = 3000; // 3 seconds
+const int64_t NOT_READY_TIMEOUT_MS = 10000; // 10 seconds
 
 std::atomic<bool> g_running{true};
 std::unique_ptr<Server> g_server;
@@ -170,6 +171,11 @@ public:
             
             std::cout << "💗 Heartbeat #" << heartbeat_count << " from " << node_name 
                       << " (client time: " << heartbeat.now_unix_ms() << "ms)" << std::endl;
+            
+            if (!g_running.load()) {
+                std::cout << "🛑 Server is shutting down, ending heartbeat stream..." << std::endl;
+                break;
+            }
         }
         
         std::cout << "💔 Heartbeat stream ended (received " << heartbeat_count 
@@ -177,7 +183,7 @@ public:
         return Status::OK;
     }
     void monitor_nodes() {
-        node_registry_.sweep(tinykube::now_ms(), HEARTBEAT_TIMEOUT_MS);
+        node_registry_.sweep(tinykube::now_ms(), HEARTBEAT_TIMEOUT_MS, NOT_READY_TIMEOUT_MS);
         
         auto nodes = node_registry_.snapshot();
         
